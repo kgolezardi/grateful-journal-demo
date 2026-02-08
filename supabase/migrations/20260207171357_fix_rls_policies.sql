@@ -3,7 +3,7 @@ alter table "public"."entries" enable row level security;
 
 -- 2. Drop potential "Ghost" policies from the prototype phase
 -- We use "IF EXISTS" so this won't crash if the policy is already gone.
-drop policy if exists "Public access" on "public"."entries";
+drop policy if exists "Public access" on "p ublic"."entries";
 drop policy if exists "Enable read access for all users" on "public"."entries";
 drop policy if exists "Enable insert for all users" on "public"."entries";
 drop policy if exists "Enable update for all users" on "public"."entries";

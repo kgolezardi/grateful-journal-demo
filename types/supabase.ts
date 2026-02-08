@@ -44,21 +44,95 @@ export type Database = {
           content: string
           created_at: string | null
           id: number
+          relationship_id: string | null
           user_id: string
         }
         Insert: {
           content: string
           created_at?: string | null
           id?: never
+          relationship_id?: string | null
           user_id?: string
         }
         Update: {
           content?: string
           created_at?: string | null
           id?: never
+          relationship_id?: string | null
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "entries_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          id: string
+          target_partner_email: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: string | null
+          id: string
+          target_partner_email?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          target_partner_email?: string | null
+        }
         Relationships: []
+      }
+      relationships: {
+        Row: {
+          created_at: string | null
+          ended_at: string | null
+          id: string
+          status: string | null
+          user_a: string
+          user_b: string
+        }
+        Insert: {
+          created_at?: string | null
+          ended_at?: string | null
+          id?: string
+          status?: string | null
+          user_a: string
+          user_b: string
+        }
+        Update: {
+          created_at?: string | null
+          ended_at?: string | null
+          id?: string
+          status?: string | null
+          user_a?: string
+          user_b?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relationships_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relationships_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
