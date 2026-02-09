@@ -105,7 +105,9 @@ export type Database = {
           id: string
           status: string | null
           user_a: string
+          user_a_ack: boolean
           user_b: string
+          user_b_ack: boolean
         }
         Insert: {
           created_at?: string | null
@@ -113,7 +115,9 @@ export type Database = {
           id?: string
           status?: string | null
           user_a: string
+          user_a_ack?: boolean
           user_b: string
+          user_b_ack?: boolean
         }
         Update: {
           created_at?: string | null
@@ -121,7 +125,9 @@ export type Database = {
           id?: string
           status?: string | null
           user_a?: string
+          user_a_ack?: boolean
           user_b?: string
+          user_b_ack?: boolean
         }
         Relationships: [
           {

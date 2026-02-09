@@ -98,3 +98,37 @@ export async function removePartner() {
   revalidatePath('/')
   return { success: true }
 }
+
+/**
+ * 5. Acknowledge Match
+ * Sets the explicit 'ack' flag on the relationship table for the current user.
+ */
+export async function acknowledgeMatch() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return
+
+  // 1. Find the active relationship
+  const { data: relationship } = await supabase
+    .from('relationships')
+    .select('id, user_a, user_b')
+    .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+    .eq('status', 'active')
+    .single()
+
+  if (!relationship) return
+
+  // 2. Determine if I am User A or User B
+  const isUserA = relationship.user_a === user.id
+  
+  // 3. Update the correct column dynamically
+  const fieldToUpdate = isUserA ? 'user_a_ack' : 'user_b_ack'
+
+  await supabase
+    .from('relationships')
+    .update({ [fieldToUpdate]: true })
+    .eq('id', relationship.id)
+
+  revalidatePath('/')
+}

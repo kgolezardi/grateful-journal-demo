@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { updateName, requestPartner, checkMatchStatus, removePartner } from '@/app/onboarding/actions'
+import { 
+  updateName, 
+  requestPartner, 
+  checkMatchStatus, 
+  removePartner, 
+  acknowledgeMatch
+} from '@/app/onboarding/actions'
 import { logout } from '@/app/auth/actions'
-import { Loader2, Heart, RefreshCw, XCircle } from 'lucide-react'
+import { Loader2, Heart, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 type Profile = {
@@ -11,11 +17,20 @@ type Profile = {
   target_partner_email: string | null
 }
 
-export default function OnboardingFlow({ initialProfile, userEmail }: { initialProfile: Profile | null, userEmail: string }) {
+export default function OnboardingFlow({ 
+  initialProfile, 
+  userEmail,
+  showSuccessModal = false
+}: { 
+  initialProfile: Profile | null, 
+  userEmail: string,
+  showSuccessModal?: boolean
+}) {
   const router = useRouter()
   
-  // Determine initial step based on profile state
+  // Determine initial step
   const getInitialStep = () => {
+    if (showSuccessModal) return 'SUCCESS'
     if (!initialProfile?.display_name) return 'NAME'
     if (initialProfile?.target_partner_email) return 'WAITING'
     return 'INVITE'
@@ -26,6 +41,13 @@ export default function OnboardingFlow({ initialProfile, userEmail }: { initialP
   const [name, setName] = useState(initialProfile?.display_name || '')
   const [partnerEmail, setPartnerEmail] = useState(initialProfile?.target_partner_email || '')
   
+  // -- ACTION: Handle the "Let's be grateful" click --
+  const handleStartJournaling = async () => {
+    setLoading(true)
+    await acknowledgeMatch() // Sets the DB flag to true
+    router.refresh() // Reloads page -> Page.tsx sees flag -> Shows Journal
+  }
+
   // -- STEP 1: NAME SUBMISSION --
   const handleNameSubmit = async () => {
     if (!name.trim()) return
@@ -44,18 +66,20 @@ export default function OnboardingFlow({ initialProfile, userEmail }: { initialP
     setStep('WAITING')
   }
 
-  // -- STEP 3: POLLING (THE WAITING ROOM) --
+  // -- STEP 3: POLLING --
   useEffect(() => {
     if (step !== 'WAITING') return
 
-    // Poll every 3 seconds to see if we matched
-    const interval = setInterval(async () => {
+    const check = async () => {
       const result = await checkMatchStatus()
       if (result.status === 'matched') {
         setStep('SUCCESS')
-        clearInterval(interval)
       }
-    }, 3000)
+    }
+
+    // Run immediately, then poll
+    check()
+    const interval = setInterval(check, 3000)
 
     return () => clearInterval(interval)
   }, [step])
@@ -69,20 +93,21 @@ export default function OnboardingFlow({ initialProfile, userEmail }: { initialP
     setStep('INVITE')
   }
 
-  // -- RENDERERS --
-
+  // -- RENDER: SUCCESS --
   if (step === 'SUCCESS') {
     return (
       <div className="max-w-md w-full text-center animate-in fade-in zoom-in duration-500">
         <div className="bg-red-50 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Heart className="text-red-500 w-12 h-12 fill-red-500" />
+          <Heart className="text-red-500 w-12 h-12 fill-red-500 animate-pulse" />
         </div>
         <h2 className="text-3xl font-bold text-gray-900 mb-2">It's a Match!</h2>
         <p className="text-gray-500 mb-8">You are now connected.</p>
         <button 
-          onClick={() => router.refresh()} 
-          className="w-full bg-gray-900 text-white p-4 rounded-2xl font-bold text-lg hover:scale-[1.02] transition-transform"
+          onClick={handleStartJournaling} 
+          disabled={loading}
+          className="w-full bg-gray-900 text-white p-4 rounded-2xl font-bold text-lg hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
         >
+          {loading && <Loader2 className="animate-spin w-5 h-5" />}
           Let's be grateful
         </button>
       </div>
@@ -142,7 +167,7 @@ export default function OnboardingFlow({ initialProfile, userEmail }: { initialP
     )
   }
 
-  // STEP: INVITE
+  // RENDER: INVITE (Default fallback)
   return (
     <div className="max-w-md w-full">
       <div className="flex justify-between items-start mb-2">

@@ -19,6 +19,7 @@ export default async function Home() {
 
   // Check Relationship
   // UPDATED: Fetches avatar_url for both users in the join
+  // Note: 'select(*)' now includes the new user_a_ack and user_b_ack columns
   const { data: relationship } = await supabase
     .from('relationships')
     .select('*, user_a_profile:profiles!user_a(display_name, avatar_url), user_b_profile:profiles!user_b(display_name, avatar_url)')
@@ -33,7 +34,23 @@ export default async function Home() {
     .eq('id', user.id)
     .single()
 
+  let showJournal = false
+  let showSuccessModal = false
+
   if (relationship) {
+    const isUserA = relationship.user_a === user.id
+    // Check specific acknowledgment column for the current user
+    const hasAcknowledged = isUserA ? relationship.user_a_ack : relationship.user_b_ack
+    
+    if (hasAcknowledged) {
+      showJournal = true
+    } else {
+      showSuccessModal = true
+    }
+  }
+
+  // --- VIEW 1: JOURNAL (Matched & Acknowledged) ---
+  if (showJournal && relationship) {
     // 1. Get Partner Name & Avatar
     const isUserA = relationship.user_a === user.id 
     // @ts-ignore
@@ -78,12 +95,14 @@ export default async function Home() {
     )
   }
 
-  // Onboarding
+  // --- VIEW 2: ONBOARDING (Intro, Waiting, or Success Modal) ---
+  // If relationship exists but !showJournal, showSuccessModal will be true
   return (
     <main className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
       <OnboardingFlow 
         initialProfile={myProfile} 
         userEmail={user.email!} 
+        showSuccessModal={showSuccessModal}
       />
     </main>
   )
