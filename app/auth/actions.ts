@@ -1,31 +1,47 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 
-export async function login(formData: FormData) {
+
+export async function sendLoginCode(email: string) {
   const supabase = await createClient()
-  const email = formData.get('email') as string
-  
+
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      shouldCreateUser: true,
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      shouldCreateUser: true, 
     },
   })
 
   if (error) {
     return { success: false, error: error.message }
   }
-  
+
   return { success: true }
+}
+
+export async function verifyLoginCode(email: string, code: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.auth.verifyOtp({
+    email,
+    token: code,
+    type: 'email',
+  })
+
+  if (error) {
+    return { success: false, error: 'Invalid code. Please try again.' }
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/')
 }
 
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  revalidatePath('/')
+  revalidatePath('/', 'layout')
   redirect('/')
 }
