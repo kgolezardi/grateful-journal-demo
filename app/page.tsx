@@ -18,9 +18,10 @@ export default async function Home() {
   }
 
   // Check Relationship
+  // UPDATED: Fetches avatar_url for both users in the join
   const { data: relationship } = await supabase
     .from('relationships')
-    .select('*, user_a_profile:profiles!user_a(display_name), user_b_profile:profiles!user_b(display_name)')
+    .select('*, user_a_profile:profiles!user_a(display_name, avatar_url), user_b_profile:profiles!user_b(display_name, avatar_url)')
     .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
     .eq('status', 'active')
     .single()
@@ -33,10 +34,13 @@ export default async function Home() {
     .single()
 
   if (relationship) {
-    // 1. Get Partner Name
+    // 1. Get Partner Name & Avatar
     const isUserA = relationship.user_a === user.id 
     // @ts-ignore
-    const partnerName = isUserA ? relationship.user_b_profile?.display_name : relationship.user_a_profile?.display_name
+    const partnerProfile = isUserA ? relationship.user_b_profile : relationship.user_a_profile
+    
+    const partnerName = partnerProfile?.display_name
+    const partnerAvatarUrl = partnerProfile?.avatar_url
 
     // 2. Fetch TODAY'S entries (Timezone Safe Fix)
     const today = new Date()
@@ -56,7 +60,10 @@ export default async function Home() {
               {myProfile?.display_name} & {partnerName || 'Partner'}
             </p>
           </div>
-          <SettingsMenu />
+          <SettingsMenu 
+            currentUserId={user.id} 
+            currentAvatarUrl={myProfile?.avatar_url} 
+          />
         </div>
 
         <GratitudeJournal 
@@ -64,6 +71,8 @@ export default async function Home() {
           currentUserId={user.id}
           partnerName={partnerName || 'Partner'}
           relationshipId={relationship.id}
+          currentUserAvatar={myProfile?.avatar_url}
+          partnerAvatar={partnerAvatarUrl}
         />
       </main>
     )

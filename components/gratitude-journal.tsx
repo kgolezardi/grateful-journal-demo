@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { saveDailyGratitude, getEntriesByDate } from '@/app/journal/actions'
-import { ChevronLeft, ChevronRight, Edit2, Heart, Loader2 } from 'lucide-react'
-import { format, addDays, isFuture, isSameDay, parseISO } from 'date-fns'
+import { ChevronLeft, ChevronRight, Edit2, Heart, Loader2, User } from 'lucide-react'
+import { format, addDays, isFuture, isSameDay } from 'date-fns'
+import Image from 'next/image'
 
 type Entry = {
   id: number
@@ -18,14 +19,18 @@ export default function GratitudeJournal({
   partnerName,
   relationshipId,
   readOnly = false,
-  initialDate
+  initialDate,
+  currentUserAvatar,
+  partnerAvatar
 }: { 
   initialEntries: Entry[], 
   currentUserId: string,
   partnerName: string,
   relationshipId: string,
   readOnly?: boolean,
-  initialDate?: string
+  initialDate?: string,
+  currentUserAvatar?: string | null,
+  partnerAvatar?: string | null
 }) {
   // 1. Initialize Date: Use the prop if valid, otherwise Today
   const [currentDate, setCurrentDate] = useState(() => {
@@ -143,7 +148,41 @@ export default function GratitudeJournal({
     setLoading(false)
   }
 
-  if (showCongrats) { /* ... keep congrats code same ... */ return null } // (Placeholder for brevity, copy your congrats code back)
+  // --- UI HELPER: Avatar Renderer ---
+  const renderAvatar = (url: string | null | undefined, fallbackColor: string) => {
+    if (url) {
+      return (
+        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm relative shrink-0">
+           <Image src={url} alt="Avatar" fill className="object-cover" />
+        </div>
+      )
+    }
+    return (
+      <div className={`w-10 h-10 rounded-full ${fallbackColor} flex items-center justify-center shadow-sm border-2 border-white shrink-0`}>
+        <User size={18} className="opacity-60" />
+      </div>
+    )
+  }
+
+  if (showCongrats) {
+    return (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-300">
+        <div className="bg-green-100 p-8 rounded-full mb-8">
+          <Heart className="w-16 h-16 text-green-600 fill-green-600 animate-pulse" />
+        </div>
+        <h2 className="text-4xl font-bold text-gray-900 mb-4">Wonderful!</h2>
+        <p className="text-gray-500 text-center max-w-xs mb-10 text-lg leading-relaxed">
+          "Gratitude turns what we have into enough."
+        </p>
+        <button 
+          onClick={() => setShowCongrats(false)}
+          className="bg-gray-900 text-white px-10 py-4 rounded-full font-bold text-lg shadow-xl hover:scale-105 transition-transform"
+        >
+          See Journal
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full max-w-md mx-auto pb-24">
@@ -181,14 +220,18 @@ export default function GratitudeJournal({
         
         {/* MY SECTION */}
         <section>
-          <div className="flex justify-between items-end mb-3 px-2">
-            <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider">You</h3>
-            
+          {/* UPDATED: Profile Header Layout */}
+          <div className="flex justify-between items-center mb-3 px-2">
+            <div className="flex items-center gap-3">
+              {renderAvatar(currentUserAvatar, "bg-blue-100 text-blue-600")}
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">You</h3>
+            </div>
+
             {/* 3. Hide Edit Button if ReadOnly */}
             {!isEditing && !readOnly && (
               <button 
                 onClick={() => setIsEditing(true)}
-                className="text-xs font-semibold text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                className="text-xs font-semibold text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded-full border border-gray-100 shadow-sm"
               >
                 <Edit2 size={12} /> Edit
               </button>
@@ -212,6 +255,7 @@ export default function GratitudeJournal({
                         onBlur={handleBlur}
                         placeholder="I'm grateful for..."
                         className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-800 placeholder:text-gray-300"
+                        autoFocus={i === 0 && text === ''}
                       />
                     </div>
                   ))}
@@ -244,7 +288,9 @@ export default function GratitudeJournal({
 
         {/* PARTNER SECTION (Copy your existing JSX) */}
         <section>
-          <div className="mb-3 px-2">
+          {/* UPDATED: Profile Header Layout */}
+          <div className="mb-3 px-2 flex items-center gap-3">
+             {renderAvatar(partnerAvatar, "bg-pink-100 text-pink-600")}
              <h3 className="text-sm font-bold text-pink-500 uppercase tracking-wider">{partnerName}</h3>
           </div>
           <div className="bg-gray-50 p-6 rounded-3xl border border-transparent">
