@@ -1,10 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
 import { getEntriesByDate } from '@/app/journal/actions' 
-import { logout } from '@/app/auth/actions'
 import LoginForm from '@/components/login-form'
 import GratitudeJournal from '@/components/gratitude-journal' 
 import OnboardingFlow from '@/components/onboarding-flow'
 import SettingsMenu from '@/components/settings-menu'
+import RefreshButton from '@/components/refresh-button' // <--- IMPORT THIS
 
 export default async function Home() {
   const supabase = await createClient()
@@ -18,8 +18,6 @@ export default async function Home() {
   }
 
   // Check Relationship
-  // UPDATED: Fetches avatar_url for both users in the join
-  // Note: 'select(*)' now includes the new user_a_ack and user_b_ack columns
   const { data: relationship } = await supabase
     .from('relationships')
     .select('*, user_a_profile:profiles!user_a(display_name, avatar_url), user_b_profile:profiles!user_b(display_name, avatar_url)')
@@ -39,7 +37,6 @@ export default async function Home() {
 
   if (relationship) {
     const isUserA = relationship.user_a === user.id
-    // Check specific acknowledgment column for the current user
     const hasAcknowledged = isUserA ? relationship.user_a_ack : relationship.user_b_ack
     
     if (hasAcknowledged) {
@@ -51,7 +48,6 @@ export default async function Home() {
 
   // --- VIEW 1: JOURNAL (Matched & Acknowledged) ---
   if (showJournal && relationship) {
-    // 1. Get Partner Name & Avatar
     const isUserA = relationship.user_a === user.id 
     // @ts-ignore
     const partnerProfile = isUserA ? relationship.user_b_profile : relationship.user_a_profile
@@ -59,12 +55,9 @@ export default async function Home() {
     const partnerName = partnerProfile?.display_name
     const partnerAvatarUrl = partnerProfile?.avatar_url
 
-    // 2. Fetch TODAY'S entries (Timezone Safe Fix)
+    // Fetch TODAY'S entries
     const today = new Date()
-    // Shift time back by 5 hours (approx EST offset) to prevent "Tomorrow" bug in the evenings
-    // This keeps the server "date" consistent with Western Hemisphere users
     today.setHours(today.getHours() - 5) 
-    
     const todayStr = today.toISOString().split('T')[0]
     const entries = await getEntriesByDate(relationship.id, todayStr)
 
@@ -77,10 +70,15 @@ export default async function Home() {
               {myProfile?.display_name} & {partnerName || 'Partner'}
             </p>
           </div>
-          <SettingsMenu 
-            currentUserId={user.id} 
-            currentAvatarUrl={myProfile?.avatar_url} 
-          />
+          
+          {/* UPDATED: Flex container for buttons */}
+          <div className="flex items-center gap-1">
+            <RefreshButton />
+            <SettingsMenu 
+              currentUserId={user.id} 
+              currentAvatarUrl={myProfile?.avatar_url} 
+            />
+          </div>
         </div>
 
         <GratitudeJournal 
@@ -95,8 +93,7 @@ export default async function Home() {
     )
   }
 
-  // --- VIEW 2: ONBOARDING (Intro, Waiting, or Success Modal) ---
-  // If relationship exists but !showJournal, showSuccessModal will be true
+  // --- VIEW 2: ONBOARDING ---
   return (
     <main className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
       <OnboardingFlow 

@@ -1,10 +1,35 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { saveDailyGratitude, getEntriesByDate } from '@/app/journal/actions'
-import { ChevronLeft, ChevronRight, Edit2, Heart, Loader2, User } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Edit2, Heart, Loader2, User, Save, X } from 'lucide-react'
 import { format, addDays, isFuture, isSameDay } from 'date-fns'
 import Image from 'next/image'
+
+// --- CONSTANTS ---
+const PLACEHOLDERS = [
+  "My partner made coffee this morning before I even woke up.",
+  "My dad sent me a meme that made me laugh out loud.",
+  "My dog was uncontrollably happy to see me when I walked in the door.",
+  "Had a 20-minute phone call with an old friend I haven't seen in years.",
+  "My toddler actually ate their vegetables without a negotiation process.",
+  "My grandmother told me a story about her childhood I'd never heard before.",
+  "A stranger held the elevator door for me when I was running late.",
+  "The meeting that could have been an email... was actually just an email.",
+  "I successfully plugged the USB drive in on the first try.",
+  "I parallel parked perfectly on the first attempt and someone saw it.",
+  "Found a crisp $20 bill in a winter coat I haven't worn since last year.",
+  "Managed to keep my white shirt clean while eating spaghetti.",
+  "My cat decided to sit on my lap instead of my keyboard for once.",
+  "I woke up thinking it was Wednesday, but it was actually Friday.",
+  "The avocado I opened for breakfast was perfectly ripe.",
+  "I finally finished that book I’ve been reading for two months.",
+  "Caught all the green lights on my drive home from work.",
+  "The barista remembered my name and my order.",
+  "It was sunny during my lunch break so I got to eat outside.",
+  "I remembered to cancel that free trial before they charged me.",
+  "Slept in for an extra 30 minutes without feeling guilty about it."
+]
 
 type Entry = {
   id: number
@@ -32,10 +57,9 @@ export default function GratitudeJournal({
   currentUserAvatar?: string | null,
   partnerAvatar?: string | null
 }) {
-  // 1. Initialize Date: Use the prop if valid, otherwise Today
+  // 1. Initialize Date
   const [currentDate, setCurrentDate] = useState(() => {
     if (initialDate) {
-      // Parse YYYY-MM-DD strictly to avoid timezone shifts
       const [y, m, d] = initialDate.split('-').map(Number)
       return new Date(y, m - 1, d)
     }
@@ -43,17 +67,23 @@ export default function GratitudeJournal({
   })
   
   const [entries, setEntries] = useState<Entry[]>(initialEntries)
+
+  useEffect(() => {
+    setEntries(initialEntries)
+  }, [initialEntries])
   
-  // --- INITIALIZATION ---
+  // Filter entries
   const myEntries = entries.filter(e => e.user_id === currentUserId)
+  const partnerEntries = entries.filter(e => e.user_id !== currentUserId)
+  const isToday = isSameDay(currentDate, new Date())
   
-  // 2. Logic: If ReadOnly, NEVER start in edit mode.
+  // 2. Edit State
   const [isEditing, setIsEditing] = useState(() => {
     if (readOnly) return false
     return myEntries.length === 0
   })
   
-  // Inputs: Pre-fill
+  // 3. Input State
   const [inputs, setInputs] = useState<string[]>(() => {
     if (myEntries.length > 0) {
       const texts = myEntries.map(e => e.content)
@@ -64,22 +94,35 @@ export default function GratitudeJournal({
     return ['', '', '']
   })
 
+  // 4. Random Placeholders State
+  const [currentPlaceholders, setCurrentPlaceholders] = useState<string[]>([])
+
+  // Initialize random placeholders on mount
+  useEffect(() => {
+    const shuffled = [...PLACEHOLDERS].sort(() => 0.5 - Math.random())
+    setCurrentPlaceholders(shuffled.slice(0, 3))
+  }, []) 
+
   const [initialInputs, setInitialInputs] = useState<string[]>(inputs)
   const [loading, setLoading] = useState(false)
   const [showCongrats, setShowCongrats] = useState(false)
-
-  const partnerEntries = entries.filter(e => e.user_id !== currentUserId)
-  const isToday = isSameDay(currentDate, new Date())
 
   // --- HELPERS ---
 
   const handleInputChange = (index: number, value: string) => {
     const newInputs = [...inputs]
     newInputs[index] = value
+    // Auto-add new line if last one is filled
     if (index === newInputs.length - 1 && value.trim() !== '') {
       newInputs.push('')
     }
     setInputs(newInputs)
+  }
+
+  // Auto-resize textarea function
+  const adjustTextareaHeight = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    e.target.style.height = 'auto'; // Reset height
+    e.target.style.height = `${e.target.scrollHeight}px`; // Set to scroll height
   }
 
   const handleBlur = () => {
@@ -105,6 +148,12 @@ export default function GratitudeJournal({
     
     setInputs(newInputs)
     setInitialInputs(newInputs)
+
+    // Re-shuffle placeholders if we are entering edit mode
+    if (shouldEdit) {
+      const shuffled = [...PLACEHOLDERS].sort(() => 0.5 - Math.random())
+      setCurrentPlaceholders(shuffled.slice(0, 3))
+    }
   }
 
   // --- ACTIONS ---
@@ -120,6 +169,7 @@ export default function GratitudeJournal({
     if (result.success) {
       const freshData = await getEntriesByDate(relationshipId, formattedDate)
       setEntries(freshData)
+      setIsEditing(false)
       resetForDate(freshData, currentDate)
       if (isToday) setShowCongrats(true)
     }
@@ -128,8 +178,6 @@ export default function GratitudeJournal({
 
   const changeDate = async (days: number) => {
     const newDate = addDays(currentDate, days)
-    // Removed "isFuture" check so you can browse forward in history if you started in the past
-    // But we still shouldn't go past *Real* today
     if (isFuture(newDate)) return 
 
     if (isEditing) {
@@ -164,6 +212,7 @@ export default function GratitudeJournal({
     )
   }
 
+  // --- CONGRATS MODAL ---
   if (showCongrats) {
     return (
       <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-300">
@@ -186,7 +235,8 @@ export default function GratitudeJournal({
 
   return (
     <div className="w-full max-w-md mx-auto pb-24">
-      {/* HEADER */}
+      
+      {/* HEADER: Date Navigation */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md pt-4 pb-4 mb-6 border-b border-gray-100">
         <div className="flex items-center justify-between bg-gray-50 p-1.5 rounded-2xl mx-2">
           <button 
@@ -202,7 +252,7 @@ export default function GratitudeJournal({
               {isToday ? 'Today' : format(currentDate, 'EEEE')}
             </span>
             <span className="text-sm font-bold text-gray-900">
-              {format(currentDate, 'MMMM d, yyyy')} {/* Added Year for History context */}
+              {format(currentDate, 'MMMM d, yyyy')}
             </span>
           </div>
 
@@ -218,20 +268,20 @@ export default function GratitudeJournal({
 
       <div className="px-4 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
-        {/* MY SECTION */}
+        {/* --- MY SECTION --- */}
         <section>
-          {/* UPDATED: Profile Header Layout */}
+          {/* Profile Header */}
           <div className="flex justify-between items-center mb-3 px-2">
             <div className="flex items-center gap-3">
               {renderAvatar(currentUserAvatar, "bg-blue-100 text-blue-600")}
               <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">You</h3>
             </div>
 
-            {/* 3. Hide Edit Button if ReadOnly */}
+            {/* Edit Button */}
             {!isEditing && !readOnly && (
               <button 
                 onClick={() => setIsEditing(true)}
-                className="text-xs font-semibold text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded-full border border-gray-100 shadow-sm"
+                className="text-xs font-semibold text-gray-400 hover:text-blue-600 flex items-center gap-1 transition-colors bg-white px-3 py-1.5 rounded-full border border-gray-100 shadow-sm"
               >
                 <Edit2 size={12} /> Edit
               </button>
@@ -240,32 +290,62 @@ export default function GratitudeJournal({
 
           <div className={`
             rounded-3xl transition-all duration-300
-            ${isEditing ? 'bg-white shadow-lg ring-4 ring-blue-50 p-6' : 'bg-white border border-gray-100 p-6 shadow-sm'}
+            ${isEditing ? 'bg-white shadow-xl ring-4 ring-blue-50 p-6' : 'bg-white border border-gray-100 p-6 shadow-sm'}
           `}>
             {isEditing ? (
-              /* INPUT MODE (Copy your existing input JSX here) */
-              <div className="space-y-4">
-                 {/* ... Input fields ... */}
+              /* --- EDIT MODE --- */
+              <div className="space-y-6">
+                 
+                 {/* THE QUESTION (Updated Font) */}
+                 <div className="border-b border-gray-100 pb-4 mb-4">
+                    <h2 className="text-xl font-bold text-gray-900 leading-relaxed">
+                      What are three things about today you&apos;re grateful for?
+                    </h2>
+                 </div>
+
+                 {/* INPUTS */}
                  {inputs.map((text, i) => (
-                    <div key={i} className="relative mb-3">
-                       <span className="absolute left-4 top-4 text-xs font-bold text-gray-300 select-none">{i + 1}</span>
-                      <input
+                    <div key={i} className="relative">
+                       {/* Number Badge */}
+                       <span className="absolute left-4 top-4 w-6 h-6 flex items-center justify-center rounded-full bg-blue-50 text-blue-600 text-xs font-bold select-none z-10">
+                         {i + 1}
+                       </span>
+                       
+                       {/* Multi-line Textarea (Auto-resize & No Handle) */}
+                       <textarea
                         value={text}
-                        onChange={(e) => handleInputChange(i, e.target.value)}
+                        onChange={(e) => {
+                          handleInputChange(i, e.target.value);
+                          adjustTextareaHeight(e); // Auto-grow
+                        }}
+                        onFocus={(e) => adjustTextareaHeight(e)} // Ensure height is correct on focus
                         onBlur={handleBlur}
-                        placeholder="I'm grateful for..."
-                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-800 placeholder:text-gray-300"
+                        placeholder={currentPlaceholders[i % currentPlaceholders.length] || "Something small..."} 
+                        className="w-full pl-12 pr-4 py-4 min-h-[5.5rem] bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-800 placeholder:text-gray-400 placeholder:font-normal resize-none overflow-hidden text-base leading-relaxed"
                         autoFocus={i === 0 && text === ''}
                       />
                     </div>
                   ))}
+
+                 {/* ACTION BUTTONS */}
                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => { setIsEditing(false); setInputs(initialInputs) }} className="flex-1 py-3 text-gray-500 font-bold text-sm bg-gray-100 rounded-xl">Cancel</button>
-                    <button onClick={handleSave} disabled={loading || inputs.filter(i => i.trim()).length === 0} className="flex-1 py-3 bg-gray-900 text-white font-bold text-sm rounded-xl">Save</button>
+                    <button 
+                      onClick={() => { setIsEditing(false); setInputs(initialInputs) }} 
+                      className="flex-1 py-4 text-gray-500 font-bold text-sm bg-gray-50 hover:bg-gray-100 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <X size={16} /> Cancel
+                    </button>
+                    <button 
+                      onClick={handleSave} 
+                      disabled={loading || inputs.filter(i => i.trim()).length === 0} 
+                      className="flex-[2] py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-200 disabled:opacity-50 disabled:shadow-none"
+                    >
+                      {loading ? <Loader2 className="animate-spin" /> : <><Save size={16} /> Save Journal</>}
+                    </button>
                  </div>
               </div>
             ) : (
-              /* VIEW MODE */
+              /* --- VIEW MODE --- */
               <ul className="space-y-4">
                 {myEntries.length > 0 ? (
                   myEntries.map((entry, i) => (
@@ -278,7 +358,7 @@ export default function GratitudeJournal({
                   ))
                 ) : (
                   <div className="text-center py-6">
-                    <p className="text-gray-400 italic text-sm mb-4">No entry for this day.</p>
+                    <p className="text-gray-400 italic mb-4">You haven&apos;t written anything yet.</p>
                   </div>
                 )}
               </ul>
@@ -286,14 +366,13 @@ export default function GratitudeJournal({
           </div>
         </section>
 
-        {/* PARTNER SECTION (Copy your existing JSX) */}
+        {/* --- PARTNER SECTION --- */}
         <section>
-          {/* UPDATED: Profile Header Layout */}
           <div className="mb-3 px-2 flex items-center gap-3">
              {renderAvatar(partnerAvatar, "bg-pink-100 text-pink-600")}
              <h3 className="text-sm font-bold text-pink-500 uppercase tracking-wider">{partnerName}</h3>
           </div>
-          <div className="bg-gray-50 p-6 rounded-3xl border border-transparent">
+          <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm">
             {partnerEntries.length > 0 ? (
               <ul className="space-y-4">
                 {partnerEntries.map((entry, i) => (
