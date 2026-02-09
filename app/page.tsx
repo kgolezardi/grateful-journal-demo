@@ -101,7 +101,8 @@ export default async function Home() {
     <main className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
       <OnboardingFlow 
         initialProfile={myProfile} 
-        userEmail={user.email!} 
+        userEmail={user.email!}
+        userId={user.id}
         showSuccessModal={showSuccessModal}
       />
     </main>

@@ -6,46 +6,52 @@ import {
   requestPartner, 
   checkMatchStatus, 
   removePartner, 
-  acknowledgeMatch
+  acknowledgeMatch 
 } from '@/app/onboarding/actions'
 import { logout } from '@/app/auth/actions'
 import { Loader2, Heart, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import AvatarUploader from '@/components/avatar-uploader' // <--- Import existing component
 
 type Profile = {
   display_name: string | null
   target_partner_email: string | null
+  avatar_url: string | null 
 }
 
 export default function OnboardingFlow({ 
   initialProfile, 
   userEmail,
-  showSuccessModal = false
+  userId,
+  showSuccessModal = false 
 }: { 
   initialProfile: Profile | null, 
   userEmail: string,
+  userId: string,
   showSuccessModal?: boolean
 }) {
   const router = useRouter()
   
-  // Determine initial step
+  // Update Initial Step Logic
   const getInitialStep = () => {
     if (showSuccessModal) return 'SUCCESS'
     if (!initialProfile?.display_name) return 'NAME'
+    if (!initialProfile?.avatar_url) return 'AVATAR' 
     if (initialProfile?.target_partner_email) return 'WAITING'
     return 'INVITE'
   }
 
-  const [step, setStep] = useState<'NAME' | 'INVITE' | 'WAITING' | 'SUCCESS'>(getInitialStep())
+  const [step, setStep] = useState<'NAME' | 'AVATAR' | 'INVITE' | 'WAITING' | 'SUCCESS'>(getInitialStep())
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState(initialProfile?.display_name || '')
   const [partnerEmail, setPartnerEmail] = useState(initialProfile?.target_partner_email || '')
+  const [currentAvatar, setCurrentAvatar] = useState(initialProfile?.avatar_url || null)
   
-  // -- ACTION: Handle the "Let's be grateful" click --
+  // -- ACTION: Handle Gratitude Click --
   const handleStartJournaling = async () => {
     setLoading(true)
-    await acknowledgeMatch() // Sets the DB flag to true
-    router.refresh() // Reloads page -> Page.tsx sees flag -> Shows Journal
+    await acknowledgeMatch()
+    router.refresh()
   }
 
   // -- STEP 1: NAME SUBMISSION --
@@ -54,10 +60,10 @@ export default function OnboardingFlow({
     setLoading(true)
     await updateName(name)
     setLoading(false)
-    setStep('INVITE')
+    setStep('AVATAR') 
   }
 
-  // -- STEP 2: PARTNER INVITE --
+  // -- STEP 3: PARTNER INVITE --
   const handleInviteSubmit = async () => {
     if (!partnerEmail.trim() || partnerEmail === userEmail) return
     setLoading(true)
@@ -66,21 +72,15 @@ export default function OnboardingFlow({
     setStep('WAITING')
   }
 
-  // -- STEP 3: POLLING --
+  // -- STEP 4: POLLING --
   useEffect(() => {
     if (step !== 'WAITING') return
-
     const check = async () => {
       const result = await checkMatchStatus()
-      if (result.status === 'matched') {
-        setStep('SUCCESS')
-      }
+      if (result.status === 'matched') setStep('SUCCESS')
     }
-
-    // Run immediately, then poll
     check()
     const interval = setInterval(check, 3000)
-
     return () => clearInterval(interval)
   }, [step])
 
@@ -93,7 +93,8 @@ export default function OnboardingFlow({
     setStep('INVITE')
   }
 
-  // -- RENDER: SUCCESS --
+  // -- RENDERERS --
+
   if (step === 'SUCCESS') {
     return (
       <div className="max-w-md w-full text-center animate-in fade-in zoom-in duration-500">
@@ -120,21 +121,13 @@ export default function OnboardingFlow({
         <div className="mb-8">
           <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900">Waiting for Partner</h2>
-          <p className="text-gray-500 mt-2">
-            Ask them to enter <strong>{userEmail}</strong> on their screen.
-          </p>
+          <p className="text-gray-500 mt-2">Ask them to enter <strong>{userEmail}</strong></p>
         </div>
-        
         <div className="bg-gray-50 p-6 rounded-2xl mb-8">
           <p className="text-sm text-gray-400 uppercase tracking-wider font-semibold mb-2">You invited</p>
           <p className="text-xl font-medium text-gray-900">{partnerEmail}</p>
         </div>
-
-        <button 
-          onClick={handleWithdraw}
-          disabled={loading}
-          className="text-red-500 font-medium hover:bg-red-50 px-6 py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mx-auto"
-        >
+        <button onClick={handleWithdraw} disabled={loading} className="text-red-500 font-medium hover:bg-red-50 px-6 py-3 rounded-xl transition-colors flex items-center justify-center gap-2 mx-auto">
           <XCircle size={20} /> Withdraw Request
         </button>
       </div>
@@ -146,7 +139,6 @@ export default function OnboardingFlow({
       <div className="max-w-md w-full">
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome</h2>
         <p className="text-gray-500 mb-8">What should we call you?</p>
-        
         <div className="space-y-4">
           <input 
             value={name}
@@ -155,11 +147,7 @@ export default function OnboardingFlow({
             className="w-full text-2xl p-4 border-b-2 border-gray-200 focus:border-blue-500 outline-none bg-transparent placeholder-gray-300 transition-colors"
             autoFocus
           />
-          <button 
-            onClick={handleNameSubmit}
-            disabled={!name.trim() || loading}
-            className="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed mt-8 hover:bg-blue-700 transition-colors"
-          >
+          <button onClick={handleNameSubmit} disabled={!name.trim() || loading} className="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold text-lg disabled:opacity-50 mt-8 hover:bg-blue-700 transition-colors">
             Continue
           </button>
         </div>
@@ -167,7 +155,31 @@ export default function OnboardingFlow({
     )
   }
 
-  // RENDER: INVITE (Default fallback)
+  if (step === 'AVATAR') {
+    return (
+      <div className="max-w-md w-full flex flex-col items-center">
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Hi, {name}!</h2>
+        <p className="text-gray-500 mb-8">Add a photo so your partner sees you.</p>
+        
+        {/* Use the reusable component */}
+        <AvatarUploader 
+          uid={userId}
+          url={currentAvatar}
+          onUploadComplete={(url) => setCurrentAvatar(url)}
+        />
+
+        <div className="w-full mt-10">
+           <button 
+            onClick={() => setStep('INVITE')}
+            className="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold text-lg hover:bg-blue-700 transition-colors"
+          >
+            {currentAvatar ? 'Looks Good' : 'Skip for now'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-md w-full">
       <div className="flex justify-between items-start mb-2">
