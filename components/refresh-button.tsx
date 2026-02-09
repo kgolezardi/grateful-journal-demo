@@ -10,7 +10,7 @@ export default function RefreshButton() {
 
   const handleRefresh = () => {
     setIsSpinning(true)
-    router.refresh()
+    window.location.reload()
     
     // Stop spinning after 1s (visual feedback only, since refresh is async void)
     setTimeout(() => setIsSpinning(false), 1000)

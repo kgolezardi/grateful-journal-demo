@@ -94,12 +94,13 @@ export default function GratitudeJournal({
     return ['', '', '']
   })
 
+  // --- NEW: Refs to track inputs for focus management ---
+  const textareaRefs = useRef<(HTMLTextAreaElement | null)[]>([])
+
   // 4. Random Placeholders State
   const [currentPlaceholders, setCurrentPlaceholders] = useState<string[]>([])
 
-  // Initialize random placeholders on mount
   useEffect(() => {
-    // UPDATED: No longer slicing. Keeps all 21 items in random order.
     const shuffled = [...PLACEHOLDERS].sort(() => 0.5 - Math.random())
     setCurrentPlaceholders(shuffled)
   }, []) 
@@ -118,6 +119,21 @@ export default function GratitudeJournal({
       newInputs.push('')
     }
     setInputs(newInputs)
+  }
+
+  // --- NEW: Handle Enter Key to Focus Next Input ---
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault() // Stop default "New Line" behavior
+      
+      const nextInput = textareaRefs.current[index + 1]
+      if (nextInput) {
+        nextInput.focus()
+      } else {
+        // If it's the last input, just blur (close keyboard) or save
+        e.currentTarget.blur()
+      }
+    }
   }
 
   // Auto-resize textarea function
@@ -150,9 +166,7 @@ export default function GratitudeJournal({
     setInputs(newInputs)
     setInitialInputs(newInputs)
 
-    // Re-shuffle placeholders if we are entering edit mode
     if (shouldEdit) {
-      // UPDATED: No longer slicing here either.
       const shuffled = [...PLACEHOLDERS].sort(() => 0.5 - Math.random())
       setCurrentPlaceholders(shuffled)
     }
@@ -298,7 +312,7 @@ export default function GratitudeJournal({
               /* --- EDIT MODE --- */
               <div className="space-y-6">
                  
-                 {/* THE QUESTION (Updated Font) */}
+                 {/* THE QUESTION */}
                  <div className="border-b border-gray-100 pb-4 mb-4">
                     <h2 className="text-xl font-bold text-gray-900 leading-relaxed">
                       What are three things about today you&apos;re grateful for?
@@ -313,18 +327,21 @@ export default function GratitudeJournal({
                          {i + 1}
                        </span>
                        
-                       {/* Multi-line Textarea (Auto-resize & No Handle) */}
                        <textarea
+                        // --- NEW: Attach Ref ---
+                        ref={(el) => { textareaRefs.current[i] = el }}
+                        // --- NEW: Handle Enter Key ---
+                        onKeyDown={(e) => handleKeyDown(e, i)}
+                        
                         value={text}
                         onChange={(e) => {
                           handleInputChange(i, e.target.value);
-                          adjustTextareaHeight(e); // Auto-grow
+                          adjustTextareaHeight(e);
                         }}
-                        onFocus={(e) => adjustTextareaHeight(e)} // Ensure height is correct on focus
+                        onFocus={(e) => adjustTextareaHeight(e)}
                         onBlur={handleBlur}
-                        // Modulo ensures we loop back to 0 if we exceed 21 lines, but 0-20 will be unique
                         placeholder={currentPlaceholders[i % currentPlaceholders.length] || "Something small..."} 
-                        className="w-full pl-12 pr-4 py-4 min-h-[5.5rem] bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-800 placeholder:text-gray-400 placeholder:font-normal resize-none overflow-hidden text-base leading-relaxed"
+                        className="w-full pl-12 pr-4 py-4 min-h-[6.5rem] bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-800 placeholder:text-gray-400 placeholder:font-normal resize-none overflow-hidden text-base leading-relaxed"
                         autoFocus={i === 0 && text === ''}
                       />
                     </div>
