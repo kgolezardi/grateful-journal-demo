@@ -43,6 +43,7 @@ export type Database = {
         Row: {
           content: string
           created_at: string | null
+          entry_date: string
           id: number
           relationship_id: string | null
           user_id: string
@@ -50,6 +51,7 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string | null
+          entry_date?: string
           id?: never
           relationship_id?: string | null
           user_id?: string
@@ -57,6 +59,7 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string | null
+          entry_date?: string
           id?: never
           relationship_id?: string | null
           user_id?: string

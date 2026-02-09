@@ -1,14 +1,13 @@
 import { createClient } from '@/utils/supabase/server'
-import { getEntries } from '@/app/journal/actions'
+import { getEntriesByDate } from '@/app/journal/actions' 
+import { logout } from '@/app/auth/actions'
 import LoginForm from '@/components/login-form'
-import JournalUI from '@/components/journal-ui'
+import GratitudeJournal from '@/components/gratitude-journal' 
 import OnboardingFlow from '@/components/onboarding-flow'
 import SettingsMenu from '@/components/settings-menu'
 
 export default async function Home() {
   const supabase = await createClient()
-  
-  // 1. Auth Check
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return (
@@ -18,8 +17,7 @@ export default async function Home() {
     )
   }
 
-  // 2. Relationship Check (The "Gatekeeper")
-  // We check if the user is already in an ACTIVE relationship.
+  // Check Relationship
   const { data: relationship } = await supabase
     .from('relationships')
     .select('*, user_a_profile:profiles!user_a(display_name), user_b_profile:profiles!user_b(display_name)')
@@ -27,50 +25,55 @@ export default async function Home() {
     .eq('status', 'active')
     .single()
 
-  // 3. Profile Check (For the onboarding state)
-  const { data: profile } = await supabase
+  // Check Profile
+  const { data: myProfile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
-  // SCENARIO A: Fully Partnered -> Show the App
   if (relationship) {
-    const entries = await getEntries(relationship.id)
-    
-    // Determine partner's name for the UI
-    const isUserA = relationship.user_a === user.id
-    // @ts-ignore (Supabase types can be tricky with joins, ignoring for prototype speed)
+    // 1. Get Partner Name
+    const isUserA = relationship.user_a === user.id 
+    // @ts-ignore
     const partnerName = isUserA ? relationship.user_b_profile?.display_name : relationship.user_a_profile?.display_name
+
+    // 2. Fetch TODAY'S entries (Timezone Safe Fix)
+    const today = new Date()
+    // Shift time back by 5 hours (approx EST offset) to prevent "Tomorrow" bug in the evenings
+    // This keeps the server "date" consistent with Western Hemisphere users
+    today.setHours(today.getHours() - 5) 
     
+    const todayStr = today.toISOString().split('T')[0]
+    const entries = await getEntriesByDate(relationship.id, todayStr)
+
     return (
-      <main className="min-h-screen bg-gray-50 flex flex-col items-center py-8 px-4">
-        {/* HEADER */}
-        <div className="w-full max-w-xl flex justify-between items-center mb-6 sticky top-0 bg-gray-50 z-10 py-4">
+      <main className="min-h-screen bg-white flex flex-col items-center py-8 px-4">
+        <div className="w-full max-w-md flex justify-between items-center mb-6 sticky top-0 bg-white z-50 py-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Our Journal</h1>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-              You & {partnerName || 'Partner'}
+            <h1 className="text-xl font-bold text-gray-900">Gratitude</h1>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+              {myProfile?.display_name} & {partnerName || 'Partner'}
             </p>
           </div>
-          
-        <SettingsMenu />
+          <SettingsMenu />
         </div>
 
-        <JournalUI 
+        <GratitudeJournal 
           initialEntries={entries} 
           currentUserId={user.id}
-          relationshipId={relationship.id} // <--- This is new
+          partnerName={partnerName || 'Partner'}
+          relationshipId={relationship.id}
         />
       </main>
     )
   }
 
-  // SCENARIO B: Not Partnered -> Show Onboarding Wizard
+  // Onboarding
   return (
     <main className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
       <OnboardingFlow 
-        initialProfile={profile} 
+        initialProfile={myProfile} 
         userEmail={user.email!} 
       />
     </main>

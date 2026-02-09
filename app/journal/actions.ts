@@ -3,13 +3,27 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export async function saveEntry(text: string) {
+// FETCH: Get entries for a specific date range or single date
+export async function getEntriesByDate(relationshipId: string, date: string) {
+  const supabase = await createClient()
+  
+  const { data } = await supabase
+    .from('entries')
+    .select('*')
+    .eq('relationship_id', relationshipId)
+    .eq('entry_date', date)
+    .order('created_at', { ascending: true }) // Keep them in order of entry
+  
+  return data || []
+}
+
+// SAVE: Sync the list for a specific date
+export async function saveDailyGratitude(texts: string[], date: string) {
   const supabase = await createClient()
   const user = (await supabase.auth.getUser()).data.user
   if (!user) return { success: false, message: 'Unauthorized' }
 
-  // Find the Active Relationship
-  // We need to attach this entry to the relationship, not just the user.
+  // 1. Find Active Relationship
   const { data: rel } = await supabase
     .from('relationships')
     .select('id')
@@ -17,61 +31,39 @@ export async function saveEntry(text: string) {
     .eq('status', 'active')
     .single()
 
-  if (!rel) return { success: false, message: 'No active relationship found' }
+  if (!rel) return { success: false, message: 'No active relationship' }
 
-  // Insert with Relationship ID
-  const { error } = await supabase
-    .from('entries')
-    .insert({ 
-      content: text, 
-      user_id: user.id, 
-      relationship_id: rel.id 
-    })
-
-  if (error) return { success: false, message: error.message }
-
-  revalidatePath('/')
-  return { success: true }
-}
-
-export async function getEntries(relationshipId?: string) {
-  const supabase = await createClient()
+  // 2. TRANSACTION-LIKE LOGIC:
+  // Since we are "syncing" the day's list, we delete old entries for THIS user on THIS date
+  // and insert the new ones.
   
-  let query = supabase
+  const { error: deleteError } = await supabase
     .from('entries')
-    .select('*')
-    .order('created_at', { ascending: false })
+    .delete()
+    .eq('user_id', user.id)
+    .eq('entry_date', date)
 
-  if (relationshipId) {
-    query = query.eq('relationship_id', relationshipId)
+  if (deleteError) return { success: false, message: deleteError.message }
+
+  // 3. Insert new entries
+  // Filter out empty strings just in case
+  const validTexts = texts.filter(t => t.trim().length > 0)
+  
+  if (validTexts.length > 0) {
+    const { error: insertError } = await supabase
+      .from('entries')
+      .insert(
+        validTexts.map(text => ({
+          content: text,
+          user_id: user.id,
+          relationship_id: rel.id,
+          entry_date: date
+        }))
+      )
+      
+    if (insertError) return { success: false, message: insertError.message }
   }
 
-  const { data } = await query // TODO: this is super interesting. What happens before await?
-  return data || [] 
-}
-
-export async function updateEntry(id: number, content: string) {
-  const supabase = await createClient()
-  const user = (await supabase.auth.getUser()).data.user
-  
-  // RLS Policy "Users can update own entries" will handle security,
-  // but checking user existence is good practice.
-  if (!user) return { success: false, message: 'Unauthorized' }
-
-  const { error } = await supabase
-    .from('entries')
-    .update({ content })
-    .eq('id', id)
-    .eq('user_id', user.id) // Double safety: ensure I own it
-
-  if (error) return { success: false, message: error.message }
-  
   revalidatePath('/')
   return { success: true }
-}
-
-export async function deleteEntry(id: number) {
-  const supabase = await createClient()
-  const { error } = await supabase.from('entries').delete().eq('id', id)
-  return { success: !error }
 }
