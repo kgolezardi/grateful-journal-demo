@@ -99,8 +99,9 @@ export default function GratitudeJournal({
 
   // Initialize random placeholders on mount
   useEffect(() => {
+    // UPDATED: No longer slicing. Keeps all 21 items in random order.
     const shuffled = [...PLACEHOLDERS].sort(() => 0.5 - Math.random())
-    setCurrentPlaceholders(shuffled.slice(0, 3))
+    setCurrentPlaceholders(shuffled)
   }, []) 
 
   const [initialInputs, setInitialInputs] = useState<string[]>(inputs)
@@ -151,8 +152,9 @@ export default function GratitudeJournal({
 
     // Re-shuffle placeholders if we are entering edit mode
     if (shouldEdit) {
+      // UPDATED: No longer slicing here either.
       const shuffled = [...PLACEHOLDERS].sort(() => 0.5 - Math.random())
-      setCurrentPlaceholders(shuffled.slice(0, 3))
+      setCurrentPlaceholders(shuffled)
     }
   }
 
@@ -320,6 +322,7 @@ export default function GratitudeJournal({
                         }}
                         onFocus={(e) => adjustTextareaHeight(e)} // Ensure height is correct on focus
                         onBlur={handleBlur}
+                        // Modulo ensures we loop back to 0 if we exceed 21 lines, but 0-20 will be unique
                         placeholder={currentPlaceholders[i % currentPlaceholders.length] || "Something small..."} 
                         className="w-full pl-12 pr-4 py-4 min-h-[5.5rem] bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all text-gray-800 placeholder:text-gray-400 placeholder:font-normal resize-none overflow-hidden text-base leading-relaxed"
                         autoFocus={i === 0 && text === ''}
