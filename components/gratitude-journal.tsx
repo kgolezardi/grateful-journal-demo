@@ -172,7 +172,7 @@ export default function GratitudeJournal({
         </div>
         <h2 className="text-4xl font-bold text-gray-900 mb-4">Wonderful!</h2>
         <p className="text-gray-500 text-center max-w-xs mb-10 text-lg leading-relaxed">
-          "Gratitude turns what we have into enough."
+          Gratitude turns what we have into enough.
         </p>
         <button 
           onClick={() => setShowCongrats(false)}

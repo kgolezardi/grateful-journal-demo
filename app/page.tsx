@@ -55,7 +55,7 @@ export default async function Home() {
       <main className="min-h-screen bg-white flex flex-col items-center py-8 px-4">
         <div className="w-full max-w-md flex justify-between items-center mb-6 sticky top-0 bg-white z-50 py-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Gratitude</h1>
+            <h1 className="text-xl font-bold text-gray-900">Grateful</h1>
             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
               {myProfile?.display_name} & {partnerName || 'Partner'}
             </p>
